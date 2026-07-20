@@ -17,6 +17,7 @@ import {
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
+import { handleSendMail } from "./routes/sendmail";
 import { Folders } from "../shared/folders";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
@@ -82,6 +83,10 @@ app.use("/api/*", cors({
 	},
 }));
 app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
+
+// -- Sendmail (external apps, API key in path) ----------------------
+
+app.post("/api/v1/sendmail/:secretKey", handleSendMail);
 
 // -- Config ---------------------------------------------------------
 

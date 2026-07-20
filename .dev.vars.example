@@ -1,3 +1,6 @@
 # Cloudflare Access (required in production). TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 POLICY_AUD=your-access-policy-audience-tag
 TEAM_DOMAIN=https://your-team.cloudflareaccess.com
+
+# Sendmail API secret (must match the value in /api/v1/sendmail/:secretKey)
+SENDMAIL_SECRET=your-local-dev-secret

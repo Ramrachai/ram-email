@@ -44,6 +44,11 @@ const app = new Hono<{ Bindings: Env }>();
 
 // Cloudflare Access JWT validation middleware (production only)
 app.use("*", async (c, next) => {
+	// Programmatic sendmail API uses its own path secret — not Cloudflare Access.
+	if (c.req.path.startsWith("/api/v1/sendmail/")) {
+		return next();
+	}
+
 	// Skip validation in development
 	if (import.meta.env.DEV) {
 		return next();
