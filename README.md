@@ -1,66 +1,178 @@
 <div align="center">
-  <h1>Ram Email</h1>
-  <p><em>A self-hosted email client with an AI agent, running entirely on Cloudflare Workers</em></p>
+
+# Ram Email
+
+**A $0 self-hosted email platform on Cloudflare — inbox, outbound mail, and a transactional REST API.**
+
+Live at **[email.ramrachai.com](https://email.ramrachai.com)**
+
+Forked and extended from [cloudflare/agentic-inbox](https://github.com/cloudflare/agentic-inbox)
+
 </div>
 
-Ram email lets you send, receive, and manage emails through a modern web interface -- all powered by your own Cloudflare account. Incoming emails arrive via [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/), each mailbox is isolated in its own [Durable Object](https://developers.cloudflare.com/durable-objects/) with a SQLite database, and attachments are stored in [R2](https://developers.cloudflare.com/r2/).
+---
 
-An **AI-powered Email Agent** can read your inbox, search conversations, and draft replies -- built with the [Cloudflare Agents SDK](https://developers.cloudflare.com/agents/) and [Workers AI](https://developers.cloudflare.com/workers-ai/).
+## Why I built this
 
-![Agentic Inbox screenshot](./demo_app.png)
+Most developers pay monthly for Google Workspace, Zoho, or a transactional provider (SendGrid, Resend, Mailgun) just to own a few addresses on their domain and send OTP or contact-form emails from their apps.
 
+**Ram Email replaces that stack with one project on Cloudflare's free tier:**
 
-Read the blog post to learn more about Cloudflare Email Service and how to use it with the Agents SDK, MCP, and from the Wrangler CLI: [Email for Agents](https://blog.cloudflare.com/email-for-agents/).
+- **Receive** mail at any `@yourdomain.com` address you create
+- **Send** from a full web inbox (compose, reply, forward, folders, search, attachments)
+- **Send programmatically** from other apps (Next.js, scripts, backends) via a secured REST API
+- **Scale addresses** — create as many mailboxes and custom addresses as you need, each with its own isolated inbox
 
-## How to setup
+No separate email SaaS bill. No vendor lock-in. You own the domain, the Worker, and the data path.
 
-**Important**: Clicking the 'Deploy to Cloudflare' button is only one part of the setup. You must follow the **After deploying** steps as well. For a full step-by-step guide with screenshots, refer to this comment: 
-https://github.com/cloudflare/agentic-inbox/issues/4#issuecomment-4269118513
+---
 
-### To set up
+## What it does
 
-1. Deploy to Cloudflare. The deploy flow will automatically provision R2, Durable Objects, and Workers AI. You'll be prompted for **DOMAINS**, which is the domain (yourdomain.com) you want to receive emails for (email@yourdomain.com).
+| Capability | Description |
+|------------|-------------|
+| **Custom addresses** | Create mailboxes like `contact@`, `hello@`, `jobs@` on your domain |
+| **Real inbox UI** | Modern React client — folders, threading, search, rich-text compose |
+| **Inbound email** | Cloudflare Email Routing → Worker → per-mailbox Durable Object (SQLite) + R2 attachments |
+| **Outbound email** | Cloudflare Email Service binding — send from your domain with proper deliverability |
+| **Transactional API** | `POST /api/v1/sendmail` — call from your portfolio, auth flows, or any backend |
+| **AI email agent** | Inherited from upstream — draft replies, search, MCP tools (optional) |
+| **Production auth** | Cloudflare Access (OTP) protects the inbox; API uses Bearer token auth |
 
-     [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/agentic-inbox)
+---
 
-2. **Configure Cloudflare Access** -- Enable [one-click Cloudflare Access](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/) on your Worker under Settings > Domains & Routes. The modal will show your `POLICY_AUD` and `TEAM_DOMAIN` values. `TEAM_DOMAIN` can be either your Access team URL or the full `.../cdn-cgi/access/certs` URL. **You must set these as secrets for your Worker.**
-3. **Set up Email Routing** -- In the Cloudflare dashboard, go to your domain > Email Routing and create a catch-all rule that forwards to this Worker
-4. **Enable Email Service** -- The worker needs the `send_email` binding to send outbound emails. See [Email Service docs](https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/)
-5. **Create a mailbox** -- Visit your deployed app and create a mailbox for any address on your domain (e.g. `hello@example.com`)
+## Transactional email API
 
-### Troubleshooting Access
+Use this from a **server-side** route only (never expose the secret in the browser).
 
-1. If you see `Invalid or expired Access token`, that usually means `POLICY_AUD` or `TEAM_DOMAIN` secrets are incorrect.
-   * Resolution: [turn Access off and back on for the Worker to get the Access modal again](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/), then reset your Worker secrets to the latest `POLICY_AUD` and `TEAM_DOMAIN` values shown there.
-2. If you see `Cloudflare Access must be configured in production`, this application is intentionally enforcing Cloudflare Access so your inbox is not exposed to anyone on the internet.
-   * Resolution: enable Access using [one-click Cloudflare Access for Workers](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/), then set the `POLICY_AUD` and `TEAM_DOMAIN` Worker secrets from the modal values.
+```typescript
+await fetch("https://email.ramrachai.com/api/v1/sendmail", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${process.env.SENDMAIL_SECRET}`,
+  },
+  body: JSON.stringify({
+    to: "user@example.com",
+    subject: "Your verification code",
+    html: "<p>Your code is <strong>482913</strong></p>",
+  }),
+});
+```
 
-## Features
+**Response (`202`):**
 
-- **Full email client** — Send and receive emails via Cloudflare Email Routing with a rich text composer, reply/forward threading, folder organization, search, and attachments
-- **Per-mailbox isolation** — Each mailbox runs in its own Durable Object with SQLite storage and R2 for attachments
-- **Built-in AI agent** — Side panel with 9 email tools for reading, searching, drafting, and sending
-- **Auto-draft on new email** — Agent automatically reads inbound emails and generates draft replies, always requiring explicit confirmation before sending
-- **Configurable and persistent** — Custom system prompts per mailbox, persistent chat history, streaming markdown responses, and tool call visibility
+```json
+{ "id": "<message-id>", "status": "sent" }
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `to` | Yes | Valid recipient email |
+| `subject` | Yes | Subject line |
+| `html` | Yes | HTML body — templates live in *your* app, not the Worker |
+
+- **From address:** configured via `SENDMAIL_FROM` (e.g. `contact@ramrachai.com`)
+- **Auth:** `Authorization: Bearer <SENDMAIL_SECRET>` (Worker secret)
+- **Storage:** sent mail is recorded in the sender mailbox's **Sent** folder
+- **Rate limits:** 20/hour, 100/day per mailbox
+
+---
+
+## How it benefits me
+
+- **Portfolio & personal site** — contact forms, OTP, password reset, notifications without a paid email API
+- **Professional identity** — real addresses on my domain (`contact@ramrachai.com`, etc.)
+- **One platform** — same system for reading replies and sending transactional mail
+- **Learning & ownership** — edge compute, Durable Objects, email routing, and API design in production
+- **Cost** — built on Cloudflare Workers free tier; no monthly email SaaS subscription
+
+---
+
+## Architecture
+
+```
+                    ┌─────────────────────────────────────────┐
+  Inbound email     │           Cloudflare Worker             │
+  (Email Routing)───┤  Hono API + React Router SSR            │
+                    │                                         │
+  Browser (inbox)───┤  /api/v1/*  ──► MailboxDO (SQLite)     │
+                    │              └──► R2 (attachments)      │
+  Next.js / API─────┤  POST /api/v1/sendmail ──► Email Service│
+                    │                                         │
+  AI / MCP ─────────┤  /agents/*  ──► EmailAgent + Workers AI │
+                    └─────────────────────────────────────────┘
+```
+
+Each mailbox = one **Durable Object** with its own SQLite database. Attachments live in **R2**. Outbound mail uses the **Email Service** `send_email` binding.
+
+---
 
 ## Stack
 
-- **Frontend:** React 19, React Router v7, Tailwind CSS, Zustand, TipTap, `@cloudflare/kumo`
-- **Backend:** Hono, Cloudflare Workers, Durable Objects (SQLite), R2, Email Routing
-- **AI Agent:** Cloudflare Agents SDK (`AIChatAgent`), AI SDK v6, Workers AI (`@cf/moonshotai/kimi-k2.5`), `react-markdown` + `remark-gfm`
-- **Auth:** Cloudflare Access JWT validation (required outside local development)
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 19, React Router v7, Tailwind CSS, TanStack Query, TipTap, `@cloudflare/kumo` |
+| Backend | Hono, Cloudflare Workers, Durable Objects, R2, Email Routing, Email Service |
+| AI (optional) | Cloudflare Agents SDK, Workers AI, MCP at `/mcp` |
+| Auth | Cloudflare Access (inbox) · Bearer token (sendmail API) |
+| Deploy | Workers Builds · Git → `master` → production |
 
-## Getting Started
+---
+
+## Fork lineage
+
+This project started from **[cloudflare/agentic-inbox](https://github.com/cloudflare/agentic-inbox)** — Cloudflare's reference email client with an AI agent.
+
+**Custom work on top of upstream:**
+
+- Transactional sendmail REST API (`/api/v1/sendmail`)
+- Bearer-token auth and Cloudflare Access bypass for the API path
+- `SENDMAIL_SECRET` / `SENDMAIL_FROM` configuration
+- Sign-out flow via `/api/v1/auth/logout`
+- Production deployment on `email.ramrachai.com` for `ramrachai.com`
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- Cloudflare account + domain
+- [Email Routing](https://developers.cloudflare.com/email-routing/) (receive)
+- [Email Service](https://developers.cloudflare.com/email-service/) (send)
+- [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) (protect inbox in production)
+
+### Local development
 
 ```bash
+git clone <your-repo>
+cd ram-email
 npm install
+cp .dev.vars.example .dev.vars   # add SENDMAIL_SECRET, POLICY_AUD, TEAM_DOMAIN
 npm run dev
 ```
 
-### Configuration
+Open `http://localhost:5173`
 
-1. Set your domain in `wrangler.jsonc`
-2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
+### Configure `wrangler.jsonc`
+
+```jsonc
+"vars": {
+  "DOMAINS": "yourdomain.com",
+  "SENDMAIL_FROM": "contact@yourdomain.com"
+}
+```
+
+### Secrets (production)
+
+```bash
+npx wrangler secret put POLICY_AUD
+npx wrangler secret put TEAM_DOMAIN
+npx wrangler secret put SENDMAIL_SECRET
+```
+
+Also enable **Cloudflare Access** on the Worker (Settings → Domains & Routes) and set up **Email Routing** catch-all → this Worker.
 
 ### Deploy
 
@@ -68,31 +180,58 @@ npm run dev
 npm run deploy
 ```
 
-## Prerequisites
+---
 
-- Cloudflare account with a domain
-- [Email Routing](https://developers.cloudflare.com/email-routing/) enabled for receiving
-- [Email Service](https://developers.cloudflare.com/email-service/) enabled for sending
-- [Workers AI](https://developers.cloudflare.com/workers-ai/) enabled (for the agent)
-- [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) configured for deployed/shared environments (required in production)
-
-Any user who passes the shared Cloudflare Access policy can access all mailboxes in this app by design. This includes the MCP server at `/mcp` -- external AI tools (Claude Code, Cursor, etc.) connected via MCP can operate on any mailbox by passing a `mailboxId` parameter. There is no per-mailbox authorization; the Cloudflare Access policy is the single trust boundary.
-
-## Architecture
+## Project structure
 
 ```
-┌──────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Browser    │────>│  Hono Worker     │────>│  MailboxDO      │
-│  React SPA   │     │  (API + SSR)     │     │  (SQLite + R2)  │
-│  Agent Panel │     │                  │     └─────────────────┘
-└──────┬───────┘     │  /agents/* ──────┼────>┌─────────────────┐
-       │             │                  │     │  EmailAgent DO  │
-       │ WebSocket   │                  │     │  (AIChatAgent)  │
-       └─────────────┤                  │     │  9 email tools  │
-                     │                  │────>│  Workers AI     │
-                     └──────────────────┘     └─────────────────┘
+app/           React inbox UI (routes, components, queries)
+workers/       Hono API, sendmail route, Durable Objects, email handler
+shared/        Shared constants (folders, dates)
+wrangler.jsonc Cloudflare bindings and environment
 ```
+
+Key files:
+
+- `workers/routes/sendmail.ts` — transactional email API
+- `workers/app.ts` — Access JWT validation + SPA routing
+- `workers/durableObject/` — mailbox storage (SQLite)
+- `app/routes/home.tsx` — mailbox management UI
+
+---
+
+## Security model
+
+| Surface | Protection |
+|---------|------------|
+| Inbox UI | Cloudflare Access (email OTP login) |
+| Sendmail API | `Authorization: Bearer` + rate limits; no Access JWT required |
+| Secrets | Worker secrets via `wrangler secret put` — survive Git deploys |
+
+Never call `/api/v1/sendmail` from client-side code. Proxy through your backend (e.g. Next.js API route).
+
+---
+
+## Want this set up for your domain?
+
+This repo is free and self-hosted — but the Cloudflare setup (Email Routing, Email Service, Access, secrets, custom domain, transactional API) takes time if you haven't done it before.
+
+**I offer a paid setup service** to deploy the full **$0 self-hosted email stack** on your Cloudflare account and domain:
+
+- Custom addresses and mailboxes (`contact@`, `hello@`, etc.)
+- Inbound + outbound email on your domain
+- Transactional REST API wired to your app (Next.js, portfolio, auth flows)
+- Production hardening (Access, secrets, sendmail API)
+
+**Interested?** Get in touch:
+
+- **Email:** [contact@ramrachai.com](mailto:contact@ramrachai.com)
+- **Web:** [ramrachai.com](https://ramrachai.com)
+
+Tell me your domain and use case — I'll reply with scope and pricing.
+
+---
 
 ## License
 
-Apache 2.0 -- see [LICENSE](LICENSE).
+Apache 2.0 — inherited from [cloudflare/agentic-inbox](https://github.com/cloudflare/agentic-inbox). See [LICENSE](LICENSE).
