@@ -2,5 +2,5 @@
 POLICY_AUD=your-access-policy-audience-tag
 TEAM_DOMAIN=https://your-team.cloudflareaccess.com
 
-# Sendmail API secret (must match the value in /api/v1/sendmail/:secretKey)
+# Sendmail API secret (send as Authorization: Bearer <secret> on POST /api/v1/sendmail)
 SENDMAIL_SECRET=your-local-dev-secret

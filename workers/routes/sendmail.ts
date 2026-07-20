@@ -28,14 +28,20 @@ function timingSafeEqual(a: string, b: string): boolean {
 	return result === 0;
 }
 
+function getBearerToken(authHeader: string | undefined): string | null {
+	if (!authHeader) return null;
+	const match = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
+	return match?.[1]?.trim() ?? null;
+}
+
 export async function handleSendMail(c: Context<{ Bindings: Env }>) {
 	const configuredSecret = c.env.SENDMAIL_SECRET;
 	if (!configuredSecret) {
 		return c.json({ error: "Sendmail API is not configured" }, 503);
 	}
 
-	const secretKey = c.req.param("secretKey") ?? "";
-	if (!timingSafeEqual(secretKey, configuredSecret)) {
+	const token = getBearerToken(c.req.header("Authorization"));
+	if (!token || !timingSafeEqual(token, configuredSecret)) {
 		return c.json({ error: "Unauthorized" }, 401);
 	}
 

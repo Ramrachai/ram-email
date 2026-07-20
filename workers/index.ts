@@ -86,7 +86,7 @@ app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
 
 // -- Sendmail (external apps, API key in path) ----------------------
 
-app.post("/api/v1/sendmail/:secretKey", handleSendMail);
+app.post("/api/v1/sendmail", handleSendMail);
 
 // -- Config ---------------------------------------------------------
 
