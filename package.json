@@ -95,7 +95,7 @@
 		"@types/react": "^19.1.2",
 		"@types/react-dom": "^19.1.2",
 		"tailwindcss": "^4.1.4",
-		"typescript": "^7.0.2",
+		"typescript": "^5.9.3",
 		"vite": "^6.3.3",
 		"vite-tsconfig-paths": "^5.1.4",
 		"wrangler": "^4.74.0"
