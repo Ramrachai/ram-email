@@ -17,6 +17,9 @@
 		"EMAIL_ADDRESSES": [],
 		"SENDMAIL_FROM": "contact@ramrachai.com"
 	},
+	"secrets": {
+		"required": ["POLICY_AUD", "TEAM_DOMAIN", "SENDMAIL_SECRET"]
+	},
 	"send_email": [
 		{
 			"name": "EMAIL",
